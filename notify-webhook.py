@@ -35,6 +35,7 @@ POST_URL = get_config('hooks.webhookurl')
 POST_USER = get_config('hooks.authuser')
 POST_PASS = get_config('hooks.authpass')
 REPO_URL = get_config('meta.url')
+AUTH_TOKEN = get_config('meta.authtoken')
 COMMIT_URL = get_config('meta.commiturl')
 if COMMIT_URL == None and REPO_URL != None:
     COMMIT_URL = REPO_URL + r'/commit/%s'
@@ -94,36 +95,21 @@ def get_revisions(old, new):
     return revisions
 
 def make_json(old, new, ref):
-    data = {
-        'before': old,
-        'after': new,
-        'ref': ref,
-        'repository': {
-            'url': REPO_URL,
-            'name': REPO_NAME,
-            'description': REPO_DESC,
-            'owner': {
-                'name': REPO_OWNER_NAME,
-                'email': REPO_OWNER_EMAIL
-                }
-            }
-        }
-
+   
     revisions = get_revisions(old, new)
-    commits = []
     for r in revisions:
         url = None
         if COMMIT_URL != None:
             url = COMMIT_URL % r['id']
-        commits.append({'id': r['id'],
-                        'author': {'name': r['name'], 'email': r['email']},
-                        'url': url,
-                        'message': r['message'],
-                        'timestamp': r['date']
-                        })
-    data['commits'] = commits
+        commit = {'source_commit':{
+            'commit_id': r['id'],
+            'author': r['name'],
+            'url': url,
+            'message': r['message']
+            }}
+    
 
-    return json.dumps(data)
+    return json.dumps(commit)
 
 
 def post(url, data):
@@ -133,9 +119,17 @@ def post(url, data):
         handler = urllib2.HTTPBasicAuthHandler(password_mgr)
         opener = urllib2.build_opener(handler)
         u = opener.open(POST_URL, urllib.urlencode({'payload': data}))
+    elif AUTH_TOKEN is not None:
+    	#handler=urllib2.HTTPHandler(debuglevel=1)
+        #opener = urllib2.build_opener(handler)
+        #urllib2.install_opener(opener)
+        request = urllib2.Request(POST_URL, data=data, headers={"X-TrackerToken": AUTH_TOKEN, "Content-Type": "application/json"})
+        #print (request)
+    	u = urllib2.urlopen(request)
     else:
         u = urllib2.urlopen(POST_URL, urllib.urlencode({'payload': data}))
-    u.read()
+
+    #u.read()
     u.close()
 
 
@@ -149,4 +143,4 @@ if __name__ == '__main__':
         else:
             print(data)
 
-
+ 
